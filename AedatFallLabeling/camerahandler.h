@@ -7,6 +7,7 @@
 #include <QMutex>
 #include <QThread>
 #include <QFuture>
+#include <QVector2D>
 
 #include <libcaer/devices/davis.h>
 #include <libcaer/devices/playback.h>
@@ -20,14 +21,12 @@ public:
     ~CameraHandler();
 
     bool connect(QString file, void (*playbackFinishedCallback) (void*), void* param);
-    bool connect(int devId = 1);
+
     void disconnect();
     void startStreaming();
     void stopStreaming();
 
     QVector2D getFrameSize();
-
-    void writeConfig();
 
     void run();
 
@@ -72,7 +71,6 @@ public:
     void (*playbackFinishedCallback) (void*);
     void* callbackParam;
 protected:
-    caerDeviceHandle m_davisHandle;
     playbackHandle m_playbackHandle;
     std::atomic_bool m_isStreaming;
     std::atomic_bool m_isConnected;

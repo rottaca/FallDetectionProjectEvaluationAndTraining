@@ -27,8 +27,15 @@ LIBS += `pkg-config --libs opencv`
 LIBS += -lcaer
 
 SOURCES += main.cpp\
-        mainwindow.cpp
+        mainwindow.cpp \
+    camerahandler.cpp \
+    eventbuffer.cpp \
+    aspectratiopixmap.cpp
 
-HEADERS  += mainwindow.h
+HEADERS  += mainwindow.h \
+    camerahandler.h \
+    datatypes.h \
+    eventbuffer.h \
+    aspectratiopixmap.h
 
 FORMS    += mainwindow.ui
