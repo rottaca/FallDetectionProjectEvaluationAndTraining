@@ -1,6 +1,6 @@
 #!/bin/bash
 
-dataDir=/tausch/FallDetectionProjectRecords
+dataDir=/tausch/FallDetectionProjectRecords/Preliminary/falls*
 labelTool=../build-AedatFallLabeling-Desktop_Qt_5_8_0_GCC_64bit-Release/AedatFallLabeling
 
 

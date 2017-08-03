@@ -27,7 +27,7 @@ void EventBuffer::addEvent(const sDVSEventDepacked &event)
     QMutexLocker locker(&m_lock);
     // Remove all old events
     while (m_buffer.size() > 0 &&
-            event.ts - m_buffer.back().ts > m_timeWindow) {
+            abs(event.ts - m_buffer.back().ts) > m_timeWindow) {
         m_buffer.pop_back();
     }
 
@@ -39,14 +39,14 @@ void EventBuffer::addEvents(std::queue<sDVSEventDepacked> & events)
     if(events.size() == 0)
         return;
 
-    uint32_t newTsStart = events.back().ts;
+    int32_t newTsStart = events.back().ts;
     QMutexLocker locker(&m_lock);
 
     // Remove all old events
     // Here, we have to lock for the whole period
 
     while (m_buffer.size() > 0 &&
-            newTsStart - m_buffer.back().ts > m_timeWindow) {
+            abs(newTsStart - m_buffer.back().ts) > m_timeWindow) {
         m_buffer.pop_back();
     }
 

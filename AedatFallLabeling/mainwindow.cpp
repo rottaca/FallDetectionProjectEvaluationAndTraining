@@ -33,7 +33,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     labelFileName = fileInfo.path() + "/" + fileInfo.baseName() + QString(".label");
     qDebug("File: %s", labelFileName.toLocal8Bit().data());
-
+    ui->l_filename->setText(labelFileName);
     timer = new QTimer(this);
     connect(timer,SIGNAL(timeout()),this,SLOT(redrawUI()));
     connect(ui->b_restart,SIGNAL(clicked()),this,SLOT(onClickRestart()));
@@ -160,11 +160,25 @@ void MainWindow::keyPressEvent(QKeyEvent *e)
             time = m_eventBuffer.getCurrTime();
             fallLabelFile << time << ";";
             break;
-        case FALLING:
+        case FALLING: {
             fallState = FALLING_DONE;
             time = m_eventBuffer.getCurrTime();
             fallLabelFile << time << ";";
-            break;
+
+            int i = -1;
+            QString fileName;
+
+            do {
+                i++;
+                fileName = QString("fall%1.png").arg(i);
+            } while(QFile(fileName).exists());
+            if(!m_currFrame.save(fileName)) {
+                qDebug("Can't save file %s!\n", fileName.toStdString().c_str());
+                QCoreApplication::exit(1);
+            }
+        }
+
+        break;
         case FALLING_DONE:
             time = m_eventBuffer.getCurrTime();
             fallState = GETTIN_UP;
@@ -178,6 +192,22 @@ void MainWindow::keyPressEvent(QKeyEvent *e)
             break;
         }
         break;
+    }
+    case Qt::Key_Y: {
+        QMutexLocker locker(&m_frameMutex);
+        int i = -1;
+        QString fileName;
+
+        do {
+            i++;
+            fileName = QString("screenshot%1.png").arg(i);
+        } while(QFile(fileName).exists());
+
+        if(!m_currFrame.save(fileName)) {
+            qDebug("Can't save file %s!\n", fileName.toStdString().c_str());
+            QCoreApplication::exit(1);
+        }
+
     }
     }
 }
