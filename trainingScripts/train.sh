@@ -14,7 +14,7 @@ opencv_traincascade -data $classfierOutputFolder \
                     -numPos `wc -l < info.dat`\
                     -numNeg `wc -l < bg.txt`\
                     -featureType HAAR \
-                    -numStages 10 \
+                    -numStages 15 \
                     -w $windowW \
                     -h $windowH
 

@@ -10,7 +10,7 @@ posDir=positive
 negDir=negative
 
 #window size for classifier
-windowW=55
+windowW=35
 windowH=35
 
 classfierOutputFolder=$dataDir/classifier

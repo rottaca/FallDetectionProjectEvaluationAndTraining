@@ -3,7 +3,7 @@ import subprocess,os,collections
 programDir="../../build-FallDetectionProject-Desktop_Qt_5_8_0_GCC_64bit-Release/"
 programName="./FallDetectionProject"
 aedatFileRoot="/tausch/FallDetectionProjectRecords/Preliminary/"
-
+takePossibleFallAsTrue=True
 paramSet = collections.OrderedDict()
 paramSet["minSpeed"] = [x / 10.0 for x in range(10, 51, 1)]
 paramSet["maxSpeed"] = [x / 10.0 for x in range(25, 101, 1)]
@@ -125,6 +125,7 @@ def executeProgAndParseOutput(cmdArgs,aedatFilePath):
     if process.returncode != 0:
         print "Non-zero return code: " + str(process.returncode)
         print err
+        print out
         exit(1)
 
     # Analize programm output
@@ -259,6 +260,10 @@ def evaluateProgWithParams(cmdArgs, aedatFilePathes, takePossibleFallAsTrue):
                         testCaseNegativeCount += 1
 
         print "------ summary -------"
+        tmp = ""
+        for a in cmdArgs:
+            tmp += a + " "
+        print "Args: " + tmp
         print "----------------------"
         print "CA: " + str(fallCA)
         print "CR: " + str(fallCR)
@@ -272,11 +277,18 @@ def evaluateProgWithParams(cmdArgs, aedatFilePathes, takePossibleFallAsTrue):
 
     os.chdir(origWD) # get back to our original working directory
     testCasesSum = testCasePositiveCount + testCaseNegativeCount
-
-    fallCA = float(fallCA)/float(testCasePositiveCount)
-    fallFR = float(fallFR)/float(testCasePositiveCount)
-    fallFA = float(fallFA)/float(testCaseNegativeCount)
-    fallCR = float(fallCR)/float(testCaseNegativeCount)
+    if testCasePositiveCount > 0:
+        fallCA = float(fallCA)/float(testCasePositiveCount)
+        fallFR = float(fallFR)/float(testCasePositiveCount)
+    else:
+        fallCA = 0
+        fallFR = 0
+    if testCaseNegativeCount > 0:
+        fallFA = float(fallFA)/float(testCaseNegativeCount)
+        fallCR = float(fallCR)/float(testCaseNegativeCount)
+    else:
+        fallFA = 0
+        fallCR = 0
 
     print "-------------------"
     print "Results"
@@ -287,6 +299,7 @@ def evaluateProgWithParams(cmdArgs, aedatFilePathes, takePossibleFallAsTrue):
     print "Test cases (P/N): " + str(testCasesSum) + " ("+ str(testCasePositiveCount) + "/"+ str(testCaseNegativeCount)  +")"
 
     return fallCA, fallFA, fallCR, fallFR, testCasePositiveCount,testCaseNegativeCount
+
 def computeScore(CA,CR,FA,FR):
     if CA+FR > 0:
         recall = CA/(CA+FR)
@@ -298,7 +311,8 @@ def computeScore(CA,CR,FA,FR):
         precision = 0
     # Youden's index
     return recall + precision - 1
-def evaluateParameterRange(paramName, valueList, aedatFilePathes, addParams):
+
+def evaluateParameterRange(paramName, valueList, aedatFilePathes, addParams, takePossibleFallAsTrue):
     headerStr = "Header: Samples: "+ str(len(aedatFilePathes)) + ", Param: \"" + paramName + "\", Values: "
     for f in valueList:
         headerStr += str(f) + ", "
@@ -315,6 +329,8 @@ def evaluateParameterRange(paramName, valueList, aedatFilePathes, addParams):
         # Header has to be equal
         if lines[0] != headerStr:
             print "Invalid output file found: " + outFile
+            print "Expected header:"
+            print headerStr
             exit(1)
         # Count number of already processed values
         skippedValueCnt = len(lines)-1
@@ -337,14 +353,14 @@ def evaluateParameterRange(paramName, valueList, aedatFilePathes, addParams):
 
         score = computeScore(CA, CR, FA, FR)
         results.append([tmp[0], score])
-    # Continue with missing values
+    # Continue with remaining values
     for v in valueList:
         args = []
         args.extend(addParams)
         args.append("--" + paramName + "=" + str(v))
         print "Parameters:"
         print(args)
-        CA, FA, CR, FR, P, N = evaluateProgWithParams(args,aedatFilePathes, True)
+        CA, FA, CR, FR, P, N = evaluateProgWithParams(args,aedatFilePathes, takePossibleFallAsTrue)
         f.write(str(v) + ";")
         f.write(str(CA) + ";")
         f.write(str(CR) + ";")
@@ -359,16 +375,29 @@ def evaluateParameterRange(paramName, valueList, aedatFilePathes, addParams):
     f.close()
     return results
 
-def evaluateParameterSet(paramSet,aedatFilePathes):
-    f = open("summary.txt","w")
-    for paramName in paramSet:
-        print "Param values for \""+ paramName+ "\":"
-        print(paramSet[paramName])
-        results = evaluateParameterRange(paramName, paramSet[paramName], aedatFilePathes,additionalCmdArgs)
-        optimalParam = max(results,key=lambda x:x[1])
-        f.write("Param: " + paramName + ", Optimal value: " + str(optimalParam[0]) + " with score " + str(optimalParam[1]))
-        f.flush()
-    f.close()
+def evaluateParameterSet(paramSet,aedatFilePathes,takePossibleFallAsTrue):
+    optimizedParams = {};
+    for i in range(0,2):
+        f = open("summary.txt","w")
+        for paramName in paramSet:
+            print "Param values for \""+ paramName+ "\":"
+            print(paramSet[paramName])
+            args = []
+            args.extend(additionalCmdArgs)
+            # Take optimal parameters from previous iterations if they exist
+            for p in optimizedParams:
+                # Don't take current parameter
+                if p != paramName:
+                    args.append("--" + p + "=" + str(optimizedParams[p]))
 
-aedatFilePathes = findAeDatFiles(aedatFileRoot)
-evaluateParameterSet(paramSet,aedatFilePathes)
+            results = evaluateParameterRange(paramName, paramSet[paramName], aedatFilePathes, args, takePossibleFallAsTrue)
+            optimalParam = max(results,key=lambda x:x[1])
+            f.write("Param: " + paramName + ", Optimal value: " + str(optimalParam[0]) + " with score " + str(optimalParam[1]))
+            f.flush()
+            optimizedParams[paramName]=optimalParam[0]
+        f.close()
+    return optimizedParams
+
+aedatFilePathes = findAeDatFiles(aedatFileRoot)[1:10]
+optimizedParams = evaluateParameterSet(paramSet,aedatFilePathes,takePossibleFallAsTrue)
+print optimizedParams
