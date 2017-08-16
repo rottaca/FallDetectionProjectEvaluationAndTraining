@@ -1,14 +1,24 @@
 import subprocess,os,collections
+import timeit
+import datetime
 
 programDir="../../build-FallDetectionProject-Desktop_Qt_5_8_0_GCC_64bit-Release/"
 programName="./FallDetectionProject"
 aedatFileRoot="/tausch/FallDetectionProjectRecords/Preliminary/"
-takePossibleFallAsTrue=True
+
+# Ignore classifier ?
+takePossibleFallAsTrue = True
+# Parameters to be evaluateds
 paramSet = collections.OrderedDict()
 paramSet["minSpeed"] = [x / 10.0 for x in range(10, 51, 1)]
-paramSet["maxSpeed"] = [x / 10.0 for x in range(25, 101, 1)]
+paramSet["maxSpeed"] = [x / 10.0 for x in range(25, 81, 1)]
 
 additionalCmdArgs=["--min"]
+optimizationRuns = 2
+
+timing_exec_count = 0
+timing_already_processed_count = 0
+startTime = timeit.default_timer()
 
 def findAeDatFiles(aedatFileRoot):
     #Finding all aedat files
@@ -114,19 +124,21 @@ def executeProgAndParseOutput(cmdArgs,aedatFilePath):
     #print "Starting programm: " + programName
     #print "With parameters: " + " ".join( str(x) for x in commandArgs)
     #print "Full command: " + " ".join( str(x) for x in command)
+    while True:
+        process = subprocess.Popen(command,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process.wait()
 
-    process = subprocess.Popen(command,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    process.wait()
+        # Get programm output
+        out, err = process.communicate()
 
-    # Get programm output
-    out, err = process.communicate()
-
-    # Check for errors
-    if process.returncode != 0:
-        print "Non-zero return code: " + str(process.returncode)
-        print err
-        print out
-        exit(1)
+        # Check for errors
+        if process.returncode != 0:
+            print "Non-zero return code: " + str(process.returncode)
+            print err
+            print out
+            #exit(1)
+    	else:
+	    break
 
     # Analize programm output
     lines = out.splitlines()
@@ -196,7 +208,11 @@ def importLabelFile(aedatFilePath):
 
     return labelFile
 
-def evaluateProgWithParams(cmdArgs, aedatFilePathes, takePossibleFallAsTrue):
+def evaluateProgWithParams(cmdArgs, aedatFilePathes):
+
+    global timing_exec_count
+    global timing_already_processed_count
+    global startTime
 
     testCasePositiveCount = 0
     testCaseNegativeCount = 0
@@ -259,20 +275,27 @@ def evaluateProgWithParams(cmdArgs, aedatFilePathes, takePossibleFallAsTrue):
 
                         testCaseNegativeCount += 1
 
-        print "------ summary -------"
+        print "------------- summary --------------"
         tmp = ""
         for a in cmdArgs:
             tmp += a + " "
-        print "Args: " + tmp
-        print "----------------------"
-        print "CA: " + str(fallCA)
-        print "CR: " + str(fallCR)
-        print "FA: " + str(fallFA)
-        print "FR: " + str(fallFR)
-        print "----------------------"
-        print "Sum N: " + str(testCaseNegativeCount)
-        print "Sum P: " + str(testCasePositiveCount)
-        print "Progress: " + str(100.0*(idx+1)/len(aedatFilePathes)) + " %"
+        print "Args:              " + tmp
+        print "------------------------------------"
+        print "CA:                " + str(fallCA)
+        print "CR:                " + str(fallCR)
+        print "FA:                " + str(fallFA)
+        print "FR:                " + str(fallFR)
+        print "------------------------------------"
+        print "Sum N:             " + str(testCaseNegativeCount)
+        print "Sum P:             " + str(testCasePositiveCount)
+        print "------------------------------------"
+        print "Elapsed time:      " + str(datetime.timedelta(seconds=(timeit.default_timer()-startTime)))
+        timing_already_processed_count+=1
+        scaling = (timing_exec_count-timing_already_processed_count)/timing_already_processed_count
+        print "Remaining time:    " + str(datetime.timedelta(seconds=(timeit.default_timer()-startTime)*scaling))
+        print "------------------------------------"
+        print "Progress (files):  " + str(100.0*(idx+1)/len(aedatFilePathes)) + " %"
+        print "Progress (global): " + str(100.0*(timing_already_processed_count)/timing_exec_count) + " %"
         idx+=1
 
     os.chdir(origWD) # get back to our original working directory
@@ -290,13 +313,13 @@ def evaluateProgWithParams(cmdArgs, aedatFilePathes, takePossibleFallAsTrue):
         fallFA = 0
         fallCR = 0
 
-    print "-------------------"
-    print "Results"
+    print "----------------------------------"
+    print "------------ Results -------------"
     print "Correct acceptance: " + str(fallCA)
-    print "False acceptance: " + str(fallFA)
-    print "Correct rejection: " + str(fallCR)
-    print "False rejection: " + str(fallFR)
-    print "Test cases (P/N): " + str(testCasesSum) + " ("+ str(testCasePositiveCount) + "/"+ str(testCaseNegativeCount)  +")"
+    print "False acceptance:   " + str(fallFA)
+    print "Correct rejection:  " + str(fallCR)
+    print "False rejection:    " + str(fallFR)
+    print "Test cases (P/N):   " + str(testCasesSum) + " ("+ str(testCasePositiveCount) + "/"+ str(testCaseNegativeCount)  +")"
 
     return fallCA, fallFA, fallCR, fallFR, testCasePositiveCount,testCaseNegativeCount
 
@@ -312,7 +335,7 @@ def computeScore(CA,CR,FA,FR):
     # Youden's index
     return recall + precision - 1
 
-def evaluateParameterRange(paramName, valueList, aedatFilePathes, addParams, takePossibleFallAsTrue):
+def evaluateParameterRange(paramName, valueList, aedatFilePathes, addParams):
     headerStr = "Header: Samples: "+ str(len(aedatFilePathes)) + ", Param: \"" + paramName + "\", Values: "
     for f in valueList:
         headerStr += str(f) + ", "
@@ -360,7 +383,7 @@ def evaluateParameterRange(paramName, valueList, aedatFilePathes, addParams, tak
         args.append("--" + paramName + "=" + str(v))
         print "Parameters:"
         print(args)
-        CA, FA, CR, FR, P, N = evaluateProgWithParams(args,aedatFilePathes, takePossibleFallAsTrue)
+        CA, FA, CR, FR, P, N = evaluateProgWithParams(args,aedatFilePathes)
         f.write(str(v) + ";")
         f.write(str(CA) + ";")
         f.write(str(CR) + ";")
@@ -375,9 +398,12 @@ def evaluateParameterRange(paramName, valueList, aedatFilePathes, addParams, tak
     f.close()
     return results
 
-def evaluateParameterSet(paramSet,aedatFilePathes,takePossibleFallAsTrue):
+def evaluateParameterSet(paramSet,aedatFilePathes):
+    global optimizationRuns
     optimizedParams = {};
-    for i in range(0,2):
+    for i in range(0,optimizationRuns):
+        print "Current optimal parameters:"
+        print optimizedParams
         f = open("summary.txt","w")
         for paramName in paramSet:
             print "Param values for \""+ paramName+ "\":"
@@ -390,14 +416,21 @@ def evaluateParameterSet(paramSet,aedatFilePathes,takePossibleFallAsTrue):
                 if p != paramName:
                     args.append("--" + p + "=" + str(optimizedParams[p]))
 
-            results = evaluateParameterRange(paramName, paramSet[paramName], aedatFilePathes, args, takePossibleFallAsTrue)
+            results = evaluateParameterRange(paramName, paramSet[paramName], aedatFilePathes, args)
             optimalParam = max(results,key=lambda x:x[1])
             f.write("Param: " + paramName + ", Optimal value: " + str(optimalParam[0]) + " with score " + str(optimalParam[1]))
             f.flush()
             optimizedParams[paramName]=optimalParam[0]
         f.close()
+
+        # move tempfiles away
+        for paramName in paramSet:
+            os.rename(paramName + ".txt",paramName + "_iter_" + str(i) + ".txt")
     return optimizedParams
 
-aedatFilePathes = findAeDatFiles(aedatFileRoot)[1:10]
-optimizedParams = evaluateParameterSet(paramSet,aedatFilePathes,takePossibleFallAsTrue)
+aedatFilePathes = findAeDatFiles(aedatFileRoot)
+# runs * files * params
+timing_exec_count = optimizationRuns*len(aedatFilePathes)*len([j for i in paramSet for j in paramSet[i]])
+print "Execute program " + str(timing_exec_count) + " times..."
+optimizedParams = evaluateParameterSet(paramSet,aedatFilePathes)
 print optimizedParams
