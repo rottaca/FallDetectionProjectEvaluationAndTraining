@@ -13,8 +13,8 @@ opencv_traincascade -data $classfierOutputFolder \
                     -vec "data.vec" \
                     -numPos `wc -l < info.dat`\
                     -numNeg `wc -l < bg.txt`\
-                    -featureType HAAR \
-                    -numStages 15 \
+                    -featureType LBP \
+                    -numStages 12 \
                     -w $windowW \
                     -h $windowH
 

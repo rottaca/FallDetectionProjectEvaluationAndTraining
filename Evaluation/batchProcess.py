@@ -5,16 +5,26 @@ import datetime
 programDir="../../build-FallDetectionProject-Desktop_Qt_5_8_0_GCC_64bit-Release/"
 programName="./FallDetectionProject"
 aedatFileRoot="/tausch/FallDetectionProjectRecords/Preliminary/"
+outputDir="output"
 
 # Ignore classifier ?
-takePossibleFallAsTrue = True
+takePossibleFallAsTrue = False
 # Parameters to be evaluateds
 paramSet = collections.OrderedDict()
-paramSet["minSpeed"] = [x / 10.0 for x in range(10, 51, 1)]
-paramSet["maxSpeed"] = [x / 10.0 for x in range(25, 81, 1)]
+paramSet["minSpeed"] = [x / 10.0 for x in range(15, 41, 1)]
+paramSet["maxSpeed"] = [x / 10.0 for x in range(30, 81, 1)]
 
+# Initial default parameters
+defaultParams = {
+    "minSpeed": 2.5,
+    "maxSpeed": 10
+}
+# Additional parameters
 additionalCmdArgs=["--min"]
-optimizationRuns = 2
+# Number of optimization loops
+optimizationRuns = 1
+
+
 
 timing_exec_count = 0
 timing_already_processed_count = 0
@@ -208,7 +218,7 @@ def importLabelFile(aedatFilePath):
 
     return labelFile
 
-def evaluateProgWithParams(cmdArgs, aedatFilePathes):
+def evaluateProgWithParams(cmdArgs, aedatFilePathes,classificationResultFileHandle):
 
     global timing_exec_count
     global timing_already_processed_count
@@ -260,19 +270,14 @@ def evaluateProgWithParams(cmdArgs, aedatFilePathes):
                 # Check each fall
                 falls = detectedFallsById[objId].getFalls()
                 for fall in falls:
-                    if labels.isValidFalltime(fall.timestamp):
-                        if fall.onlyPossible and not takePossibleFallAsTrue:
-                            fallFR += 1
-                        else:
-                            fallCA += 1
+                    if fall.onlyPossible and not takePossibleFallAsTrue:
+                        continue
 
+                    if labels.isValidFalltime(fall.timestamp):
+                        fallCA += 1
                         testCasePositiveCount += 1
                     else:
-                        if fall.onlyPossible and not takePossibleFallAsTrue:
-                            fallCR += 1
-                        else:
-                            fallFA += 1
-
+                        fallFA += 1
                         testCaseNegativeCount += 1
 
         print "------------- summary --------------"
@@ -298,20 +303,28 @@ def evaluateProgWithParams(cmdArgs, aedatFilePathes):
         print "Progress (global): " + str(100.0*(timing_already_processed_count)/timing_exec_count) + " %"
         idx+=1
 
+        classificationResultFileHandle.write(aedatFilePath + ";")
+        classificationResultFileHandle.write(str(fallCA) + ";")
+        classificationResultFileHandle.write(str(fallCR) + ";")
+        classificationResultFileHandle.write(str(fallFA) + ";")
+        classificationResultFileHandle.write(str(fallFR))
+        classificationResultFileHandle.write("\n")
+        classificationResultFileHandle.flush()
+
     os.chdir(origWD) # get back to our original working directory
-    testCasesSum = testCasePositiveCount + testCaseNegativeCount
-    if testCasePositiveCount > 0:
-        fallCA = float(fallCA)/float(testCasePositiveCount)
-        fallFR = float(fallFR)/float(testCasePositiveCount)
-    else:
-        fallCA = 0
-        fallFR = 0
-    if testCaseNegativeCount > 0:
-        fallFA = float(fallFA)/float(testCaseNegativeCount)
-        fallCR = float(fallCR)/float(testCaseNegativeCount)
-    else:
-        fallFA = 0
-        fallCR = 0
+    #testCasesSum = testCasePositiveCount + testCaseNegativeCount
+    #if testCasePositiveCount > 0:
+    #    fallCA = float(fallCA)/float(testCasePositiveCount)
+    #    fallFR = float(fallFR)/float(testCasePositiveCount)
+    #else:
+    #    fallCA = 0
+    #    fallFR = 0
+    #if testCaseNegativeCount > 0:
+    #    fallFA = float(fallFA)/float(testCaseNegativeCount)
+    #    fallCR = float(fallCR)/float(testCaseNegativeCount)
+    #else:
+    #    fallFA = 0
+    #    fallCR = 0
 
     print "----------------------------------"
     print "------------ Results -------------"
@@ -325,47 +338,53 @@ def evaluateProgWithParams(cmdArgs, aedatFilePathes):
 
 def computeScore(CA,CR,FA,FR):
     if CA+FR > 0:
-        recall = CA/(CA+FR)
+        sensitivity = CA/(CA+FR)
     else:
-        recall = 0
+        sensitivity = 0
     if CA+FA > 0:
-        precision = CA/(CA+FA)
+        specificity = CR/(CR+FA)
     else:
-        precision = 0
+        specificity = 0
     # Youden's index
-    return recall + precision - 1
+    return sensitivity + specificity - 1
 
-def evaluateParameterRange(paramName, valueList, aedatFilePathes, addParams):
+def evaluateParameterRange(paramName, valueList, aedatFilePathes, addParams, outFileSuffix):
+    global timing_already_processed_count
+    global timing_exec_count
+    global outputDir
+
     headerStr = "Header: Samples: "+ str(len(aedatFilePathes)) + ", Param: \"" + paramName + "\", Values: "
-    for f in valueList:
-        headerStr += str(f) + ", "
+    for v in valueList:
+        headerStr += str(v) + ", "
     headerStr=headerStr[:-2]
     headerStr += "\n"
-    outFile = paramName + ".txt"
-
+    paramValuesOutFileName = outputDir + "/" + paramName + "_" + outFileSuffix + ".txt"
     skippedValueCnt = 0
     # Check if file exists (backup) and continue with next value
-    if os.path.isfile(outFile):
-        f = open(outFile,"a+")
+    if os.path.isfile(paramValuesOutFileName):
+        paramValuesHandle = open(paramValuesOutFileName,"a+")
+
         # Read text from file
-        lines = f.readlines()
+        lines = paramValuesHandle.readlines()
         # Header has to be equal
         if lines[0] != headerStr:
-            print "Invalid output file found: " + outFile
+            print "Invalid output file found: " + paramValuesOutFileName
             print "Expected header:"
             print headerStr
             exit(1)
         # Count number of already processed values
         skippedValueCnt = len(lines)-1
         print "Output file found! Contains already " + str(skippedValueCnt) + " parameter value(s)."
+        # Update numer of required executions
+        timing_exec_count -= skippedValueCnt*len(aedatFilePathes)
         valueList = valueList[skippedValueCnt:]
         print "Remaining values to be processed:"
         print(valueList)
     else:
         # File does not exist, create a new one and write the header
-        f = open(outFile,"w")
-        f.write(headerStr)
-        f.flush()
+        paramValuesHandle = open(paramValuesOutFileName,"w")
+        paramValuesHandle.write(headerStr)
+        paramValuesHandle.flush()
 
     # For all parameters, evaluate program
     results = []
@@ -383,28 +402,40 @@ def evaluateParameterRange(paramName, valueList, aedatFilePathes, addParams):
         args.append("--" + paramName + "=" + str(v))
         print "Parameters:"
         print(args)
-        CA, FA, CR, FR, P, N = evaluateProgWithParams(args,aedatFilePathes)
-        f.write(str(v) + ";")
-        f.write(str(CA) + ";")
-        f.write(str(CR) + ";")
-        f.write(str(FA) + ";")
-        f.write(str(FR) + ";")
-        f.write(str(P) + ";")
-        f.write(str(N) + "\n")
-        f.flush()
+
+        classificationResultFileName = outputDir + "/" + "classification_" +  paramName + "_" + str(v) + "_" + outFileSuffix + ".txt"
+        classificationResultFileHandle = open(classificationResultFileName,"w")
+        tmp = ""
+        for v in args:
+            tmp += str(v) + ", "
+        tmp=tmp[:-2]
+        classificationResultFileHandle.write("Programm arguments: " + tmp + "\n")
+        classificationResultFileHandle.flush()
+
+        CA, FA, CR, FR, P, N = evaluateProgWithParams(args,aedatFilePathes,classificationResultFileHandle)
+        
+        classificationResultFileHandle.close()
+
+        paramValuesHandle.write(str(v) + ";")
+        paramValuesHandle.write(str(CA) + ";")
+        paramValuesHandle.write(str(CR) + ";")
+        paramValuesHandle.write(str(FA) + ";")
+        paramValuesHandle.write(str(FR) + ";")
+        paramValuesHandle.write(str(P) + ";")
+        paramValuesHandle.write(str(N) + "\n")
+        paramValuesHandle.flush()
 
         score = computeScore(CA, CR, FA, FR)
         results.append([v, score])
-    f.close()
+    paramValuesHandle.close()
     return results
 
-def evaluateParameterSet(paramSet,aedatFilePathes):
-    global optimizationRuns
-    optimizedParams = {};
+def evaluateParameterSet(paramSet,aedatFilePathes, optimizedParams, optimizationRuns):
+    global outputDir
     for i in range(0,optimizationRuns):
         print "Current optimal parameters:"
         print optimizedParams
-        f = open("summary.txt","w")
+        summaryFileHandle = open(outputDir + "/" + "summary.txt","w")
         for paramName in paramSet:
             print "Param values for \""+ paramName+ "\":"
             print(paramSet[paramName])
@@ -416,21 +447,20 @@ def evaluateParameterSet(paramSet,aedatFilePathes):
                 if p != paramName:
                     args.append("--" + p + "=" + str(optimizedParams[p]))
 
-            results = evaluateParameterRange(paramName, paramSet[paramName], aedatFilePathes, args)
+            results = evaluateParameterRange(paramName, paramSet[paramName], aedatFilePathes, args, "iter_" + str(i))
             optimalParam = max(results,key=lambda x:x[1])
-            f.write("Param: " + paramName + ", Optimal value: " + str(optimalParam[0]) + " with score " + str(optimalParam[1]))
-            f.flush()
+            summaryFileHandle.write("Param: " + paramName + ", Optimal value: " + str(optimalParam[0]) + " with score " + str(optimalParam[1]) + "\n")
+            summaryFileHandle.flush()
             optimizedParams[paramName]=optimalParam[0]
-        f.close()
+        summaryFileHandle.close()
 
-        # move tempfiles away
-        for paramName in paramSet:
-            os.rename(paramName + ".txt",paramName + "_iter_" + str(i) + ".txt")
     return optimizedParams
 
 aedatFilePathes = findAeDatFiles(aedatFileRoot)
 # runs * files * params
 timing_exec_count = optimizationRuns*len(aedatFilePathes)*len([j for i in paramSet for j in paramSet[i]])
 print "Execute program " + str(timing_exec_count) + " times..."
-optimizedParams = evaluateParameterSet(paramSet,aedatFilePathes)
+if not os.path.isdir(outputDir):
+    os.makedirs(outputDir)
+optimizedParams = evaluateParameterSet(paramSet,aedatFilePathes,defaultParams, optimizationRuns)
 print optimizedParams

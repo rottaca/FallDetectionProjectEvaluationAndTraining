@@ -159,11 +159,15 @@ void MainWindow::keyPressEvent(QKeyEvent *e)
             fallState = FALLING;
             time = m_eventBuffer.getCurrTime();
             fallLabelFile << time << ";";
+            playSpeed = qMax(0.25f,minSpeed);
+            camHandler.changePlaybackSpeed(playSpeed);
             break;
         case FALLING: {
             fallState = FALLING_DONE;
             time = m_eventBuffer.getCurrTime();
             fallLabelFile << time << ";";
+            playSpeed = qMax(0.5f,minSpeed);
+            camHandler.changePlaybackSpeed(playSpeed);
 
             int i = -1;
             QString fileName;
@@ -179,16 +183,33 @@ void MainWindow::keyPressEvent(QKeyEvent *e)
         }
 
         break;
-        case FALLING_DONE:
+        case FALLING_DONE: {
             time = m_eventBuffer.getCurrTime();
             fallState = GETTIN_UP;
             fallLabelFile << time << ";";
-            break;
+
+            playSpeed = qMax(0.75f,minSpeed);
+            camHandler.changePlaybackSpeed(playSpeed);
+            int i = -1;
+            QString fileName;
+
+            do {
+                i++;
+                fileName = QString("fall%1.png").arg(i);
+            } while(QFile(fileName).exists());
+            if(!m_currFrame.save(fileName)) {
+                qDebug("Can't save file %s!\n", fileName.toStdString().c_str());
+                QCoreApplication::exit(1);
+            }
+        }
+        break;
         case GETTIN_UP:
             fallState = NONE;
             time = m_eventBuffer.getCurrTime();
             fallLabelFile << time;
             fallLabelFile << std::endl;
+            playSpeed = 1;
+            camHandler.changePlaybackSpeed(playSpeed);
             break;
         }
         break;

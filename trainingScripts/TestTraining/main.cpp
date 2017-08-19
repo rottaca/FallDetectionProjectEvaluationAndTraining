@@ -20,24 +20,26 @@
  /** @function main */
  int main( int argc, const char** argv )
  {
-   if(argc != 3){
+   if(argc < 3){
      cout << "Invalid arguments!" << endl;
     return -1;
    }
 
    //-- 1. Load the cascades
    if( !cascade.load( argv[1] ) ){ printf("--(!)Error loading classifier: %s\n", argv[1]); return -1; };
-   Mat frame = imread(argv[2], CV_LOAD_IMAGE_COLOR);
-   if( !frame.empty() )
-   {
-      detectAndDisplay( frame );
+   for(int i = 2; i < argc-2;i++){
+     Mat frame = imread(argv[i], CV_LOAD_IMAGE_COLOR);
+     if( !frame.empty() )
+     {
+        detectAndDisplay( frame );
+     }
+     else{
+        cout << "Invalid image: " << argv[i] << endl;
+        return -1;
+     }
+ 
+     int c = waitKey();
    }
-   else{
-      cout << "Invalid image: " << argv[2] << endl;
-      return -1;
-   }
-
-   int c = waitKey();
    return 0;
  }
 

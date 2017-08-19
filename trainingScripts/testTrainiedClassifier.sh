@@ -2,8 +2,7 @@
 
 source setup.sh
 
-imageFiles="$dataDir/$posDir/*"
-classifier="$classfierOutputFolder/cascade_15stages.xml"
+classifier="$classfierOutputFolder/cascade.xml"
 
 if [[ ! -f ./TestTraining/build/TestTraining ]]; then
   mkdir TestTraining/build
@@ -12,6 +11,4 @@ if [[ ! -f ./TestTraining/build/TestTraining ]]; then
   popd
 fi
 
-for file in $imageFiles; do
-  ./TestTraining/build/TestTraining $classifier $file || exit 1
-done
+./TestTraining/build/TestTraining $classifier $@ || exit 1
