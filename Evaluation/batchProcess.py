@@ -224,19 +224,20 @@ def evaluateProgWithParams(cmdArgs, aedatFilePathes,classificationResultFileHand
     global timing_already_processed_count
     global startTime
 
-    testCasePositiveCount = 0
-    testCaseNegativeCount = 0
-
-    fallFR = 0
-    fallFA = 0
-    fallCA = 0
-    fallCR = 0
+    FRSum = 0
+    FASum = 0
+    CASum = 0
+    CRSum = 0
 
     # Execute programm in its directory
     origWD = os.getcwd() # remember our original working directory
     os.chdir(programDir)
     idx = 0
     for aedatFilePath in aedatFilePathes:
+        FRSumOld = FRSum
+        FASumOld = FASum
+        CASumOld = CASum
+        CRSumOld = CRSum
 
         detectedFallsById = executeProgAndParseOutput(cmdArgs,aedatFilePath)
         labels = importLabelFile(aedatFilePath)
@@ -245,24 +246,12 @@ def evaluateProgWithParams(cmdArgs, aedatFilePathes,classificationResultFileHand
         print "Detected falls:"
         print(detectedFallsById)
 
-        delayed = 0
-        onlyPossible = 0
-        direct = 0
-        for ID in detectedFallsById:
-            delayed += detectedFallsById[ID].countDelayed()
-            direct += detectedFallsById[ID].countDirect()
-            onlyPossible += detectedFallsById[ID].countPossible()
-        sumDetected = direct + delayed
-
-
         if len(detectedFallsById) == 0:
             print "Nothing detected"
             if labels.getLen() > 0:
-                fallFR += labels.getLen()
-                testCasePositiveCount += 1
+                FRSum += labels.getLen()
             else:
-                fallCR += 1
-                testCaseNegativeCount += 1
+                CRSum += 1
         else:
             # Check if there is a valid fall
             # for each object
@@ -274,11 +263,9 @@ def evaluateProgWithParams(cmdArgs, aedatFilePathes,classificationResultFileHand
                         continue
 
                     if labels.isValidFalltime(fall.timestamp):
-                        fallCA += 1
-                        testCasePositiveCount += 1
+                        CASum += 1
                     else:
-                        fallFA += 1
-                        testCaseNegativeCount += 1
+                        FASum += 1
 
         print "------------- summary --------------"
         tmp = ""
@@ -286,13 +273,13 @@ def evaluateProgWithParams(cmdArgs, aedatFilePathes,classificationResultFileHand
             tmp += a + " "
         print "Args:              " + tmp
         print "------------------------------------"
-        print "CA:                " + str(fallCA)
-        print "CR:                " + str(fallCR)
-        print "FA:                " + str(fallFA)
-        print "FR:                " + str(fallFR)
+        print "CA:                " + str(CASum)
+        print "CR:                " + str(CRSum)
+        print "FA:                " + str(FASum)
+        print "FR:                " + str(FRSum)
         print "------------------------------------"
-        print "Sum N:             " + str(testCaseNegativeCount)
-        print "Sum P:             " + str(testCasePositiveCount)
+        print "Sum N:             " + str(FASum+CRSum)
+        print "Sum P:             " + str(CASum+FRSum)
         print "------------------------------------"
         print "Elapsed time:      " + str(datetime.timedelta(seconds=(timeit.default_timer()-startTime)))
         timing_already_processed_count+=1
@@ -304,37 +291,24 @@ def evaluateProgWithParams(cmdArgs, aedatFilePathes,classificationResultFileHand
         idx+=1
 
         classificationResultFileHandle.write(aedatFilePath + ";")
-        classificationResultFileHandle.write(str(fallCA) + ";")
-        classificationResultFileHandle.write(str(fallCR) + ";")
-        classificationResultFileHandle.write(str(fallFA) + ";")
-        classificationResultFileHandle.write(str(fallFR))
+        classificationResultFileHandle.write(str(CASum-CASumOld) + ";")
+        classificationResultFileHandle.write(str(CRSum-CRSumOld) + ";")
+        classificationResultFileHandle.write(str(FASum-FASumOld) + ";")
+        classificationResultFileHandle.write(str(FRSum-FRSumOld))
         classificationResultFileHandle.write("\n")
         classificationResultFileHandle.flush()
 
     os.chdir(origWD) # get back to our original working directory
-    #testCasesSum = testCasePositiveCount + testCaseNegativeCount
-    #if testCasePositiveCount > 0:
-    #    fallCA = float(fallCA)/float(testCasePositiveCount)
-    #    fallFR = float(fallFR)/float(testCasePositiveCount)
-    #else:
-    #    fallCA = 0
-    #    fallFR = 0
-    #if testCaseNegativeCount > 0:
-    #    fallFA = float(fallFA)/float(testCaseNegativeCount)
-    #    fallCR = float(fallCR)/float(testCaseNegativeCount)
-    #else:
-    #    fallFA = 0
-    #    fallCR = 0
 
     print "----------------------------------"
     print "------------ Results -------------"
-    print "Correct acceptance: " + str(fallCA)
-    print "False acceptance:   " + str(fallFA)
-    print "Correct rejection:  " + str(fallCR)
-    print "False rejection:    " + str(fallFR)
-    print "Test cases (P/N):   " + str(testCasesSum) + " ("+ str(testCasePositiveCount) + "/"+ str(testCaseNegativeCount)  +")"
+    print "Correct accepted: " + str(CASum)
+    print "False accepted:   " + str(FASum)
+    print "Correct rejected:  " + str(CRSum)
+    print "False rejected:    " + str(FRSum)
+    print "Test cases (P/N):   " + str(CASum + FASum + CRSum + FRSum) + " ("+ str(CASum+FRSum) + "/"+ str(FASum+CRSum)  +")"
 
-    return fallCA, fallFA, fallCR, fallFR, testCasePositiveCount,testCaseNegativeCount
+    return CASum, FASum, CRSum, FRSum
 
 def computeScore(CA,CR,FA,FR):
     if CA+FR > 0:
@@ -412,17 +386,15 @@ def evaluateParameterRange(paramName, valueList, aedatFilePathes, addParams, out
         classificationResultFileHandle.write("Programm arguments: " + tmp + "\n")
         classificationResultFileHandle.flush()
 
-        CA, FA, CR, FR, P, N = evaluateProgWithParams(args,aedatFilePathes,classificationResultFileHandle)
-        
+        CA, FA, CR, FR = evaluateProgWithParams(args,aedatFilePathes,classificationResultFileHandle)
+
         classificationResultFileHandle.close()
 
         paramValuesHandle.write(str(v) + ";")
         paramValuesHandle.write(str(CA) + ";")
         paramValuesHandle.write(str(CR) + ";")
         paramValuesHandle.write(str(FA) + ";")
-        paramValuesHandle.write(str(FR) + ";")
-        paramValuesHandle.write(str(P) + ";")
-        paramValuesHandle.write(str(N) + "\n")
+        paramValuesHandle.write(str(FR) + "\n")
         paramValuesHandle.flush()
 
         score = computeScore(CA, CR, FA, FR)
