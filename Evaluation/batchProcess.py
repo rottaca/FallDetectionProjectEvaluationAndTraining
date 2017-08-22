@@ -5,7 +5,7 @@ import datetime
 programDir="../../build-FallDetectionProject-Desktop_Qt_5_8_0_GCC_64bit-Release/"
 programName="./FallDetectionProject"
 aedatFileRoot="/tausch/FallDetectionProjectRecords/Preliminary/"
-outputDir="output"
+outputDir="/tausch/FallDetectionProjectRecords/EvaluationOutput/"
 
 # Ignore classifier ?
 takePossibleFallAsTrue = False
@@ -16,7 +16,7 @@ paramSet["maxSpeed"] = [x / 10.0 for x in range(30, 81, 1)]
 
 # Initial default parameters
 defaultParams = {
-    "minSpeed": 2.5,
+    "minSpeed": 3.2,
     "maxSpeed": 10
 }
 # Additional parameters
@@ -182,16 +182,25 @@ def executeProgAndParseOutput(cmdArgs,aedatFilePath):
 class Labels:
     def __init__(self):
         self.falls = []
-
+        self.foundFalls = []
     def addFall(self,times):
         assert len(times) == 4
         self.falls.append(times)
-
+    def resetFoundFalls(self):
+        self.foundFalls = []
     def isValidFalltime(self,time):
+        i=0
         for fall in self.falls:
+            # Valid fall ?
             if time >= fall[0] and time <= fall[3]:
-                return True
-        return False
+                # Already detected ?
+                if i in foundFalls:
+                    return -1
+                else:
+                    foundFalls.append(i)
+                    return 1
+            i+=1
+        return 0
 
     def getLen(self):
         return len(self.falls)
@@ -255,14 +264,15 @@ def evaluateProgWithParams(cmdArgs, aedatFilePathes,classificationResultFileHand
         else:
             # Check if there is a valid fall
             # for each object
+            labels.resetFoundFalls()
             for objId in detectedFallsById:
                 # Check each fall
                 falls = detectedFallsById[objId].getFalls()
                 for fall in falls:
                     if fall.onlyPossible and not takePossibleFallAsTrue:
                         continue
-
-                    if labels.isValidFalltime(fall.timestamp):
+                    res = labels.isValidFalltime(fall.timestamp)
+                    if res == 1:
                         CASum += 1
                     else:
                         FASum += 1
@@ -312,11 +322,11 @@ def evaluateProgWithParams(cmdArgs, aedatFilePathes,classificationResultFileHand
 
 def computeScore(CA,CR,FA,FR):
     if CA+FR > 0:
-        sensitivity = CA/(CA+FR)
+        sensitivity = float(CA)/(CA+FR)
     else:
         sensitivity = 0
-    if CA+FA > 0:
-        specificity = CR/(CR+FA)
+    if CR+FA > 0:
+        specificity = float(CR)/(CR+FA)
     else:
         specificity = 0
     # Youden's index
@@ -327,9 +337,9 @@ def evaluateParameterRange(paramName, valueList, aedatFilePathes, addParams, out
     global timing_exec_count
     global outputDir
 
-    headerStr = "Header: Samples: "+ str(len(aedatFilePathes)) + ", Param: \"" + paramName + "\", Values: "
-    for v in valueList:
-        headerStr += str(v) + ", "
+    headerStr = "Samples: "+ str(len(aedatFilePathes)) + ", Param: \"" + paramName + "\", Values: "
+    for i in valueList:
+        headerStr += str(i) + ", "
     headerStr=headerStr[:-2]
     headerStr += "\n"
     paramValuesOutFileName = outputDir + "/" + paramName + "_" + outFileSuffix + ".txt"
@@ -380,8 +390,8 @@ def evaluateParameterRange(paramName, valueList, aedatFilePathes, addParams, out
         classificationResultFileName = outputDir + "/" + "classification_" +  paramName + "_" + str(v) + "_" + outFileSuffix + ".txt"
         classificationResultFileHandle = open(classificationResultFileName,"w")
         tmp = ""
-        for v in args:
-            tmp += str(v) + ", "
+        for i in args:
+            tmp += str(i) + ", "
         tmp=tmp[:-2]
         classificationResultFileHandle.write("Programm arguments: " + tmp + "\n")
         classificationResultFileHandle.flush()

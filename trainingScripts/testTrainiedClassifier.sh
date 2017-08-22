@@ -2,7 +2,8 @@
 
 source setup.sh
 
-classifier="$classfierOutputFolder/cascade.xml"
+classifiers="$dataDir/classifier/cascade.xml
+            "
 
 if [[ ! -f ./TestTraining/build/TestTraining ]]; then
   mkdir TestTraining/build
@@ -11,4 +12,7 @@ if [[ ! -f ./TestTraining/build/TestTraining ]]; then
   popd
 fi
 
-./TestTraining/build/TestTraining $classifier $@ || exit 1
+for classifier in $classifiers; do
+  echo $classifier
+  ./TestTraining/build/TestTraining $classifier $dataDir $@ || exit 1
+done
