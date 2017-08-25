@@ -2,6 +2,7 @@ import subprocess,os,collections
 import timeit
 import datetime
 import evaluationTools
+import sys
 
 programDir="../../build-FallDetectionProject-Desktop_Qt_5_8_0_GCC_64bit-Release/"
 programName="./FallDetectionProject"
@@ -12,22 +13,14 @@ ignoreAedatFileParts= [] #["fallingObjects"];
 
 # Ignore classifier ?
 takePossibleFallAsTrue = False
-# Parameters to be evaluateds
-paramSet = collections.OrderedDict()
-paramSet["minSpeed"] = [x / 10.0 for x in range(15, 41, 1)]
-paramSet["maxSpeed"] = [x / 10.0 for x in range(30, 81, 1)]
 
-# Initial default parameters
-defaultParams = {
-    "minSpeed": 3.2,
-    "maxSpeed": 10
-}
 # Additional parameters
-additionalCmdArgs=["--min"]
-# Number of optimization loops
-optimizationRuns = 1
+additionalCmdArgs=[str(i) for i in sys.argv[1:]]#["--max", "--minSpeed=2.5", "--maxSpeed=5"]
 
+f=open("FallInfo.txt","w")
 
 evalTools = evaluationTools.EvaluationTools(aedatFileRoot,programDir,programName,outputDir,ignoreAedatFileParts,takePossibleFallAsTrue)
-optimizedParams = evalTools.evaluateParameterSet(paramSet,defaultParams,additionalCmdArgs, optimizationRuns)
-print optimizedParams
+evalTools.timing_exec_count = len(evalTools.datFiles)
+CASum, FASum, CRSum, FRSum = evalTools.evaluateProgWithParams(additionalCmdArgs,fallInfoFileHandle=f)
+
+f.close()
