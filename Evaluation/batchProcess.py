@@ -12,15 +12,17 @@ ignoreAedatFileParts= [] #["fallingObjects"];
 
 # Ignore classifier ?
 takePossibleFallAsTrue = False
-# Parameters to be evaluateds
+# Parameters to be evaluated
 paramSet = collections.OrderedDict()
-paramSet["minSpeed"] = [x / 10.0 for x in range(15, 41, 1)]
-paramSet["maxSpeed"] = [x / 10.0 for x in range(30, 81, 1)]
+paramSet["minSpeed"] = [x / 10.0 for x in range(10, 41, 1)]
+paramSet["maxSpeed"] = [x / 10.0 for x in range(20, 61, 1)]
+paramSet["fallY"] = [x for x in range(110, 171,5)]
 
 # Initial default parameters
 defaultParams = {
-    "minSpeed": 3.2,
-    "maxSpeed": 10
+    "minSpeed": 1.8,
+    "maxSpeed": 4.5,
+    "fallY":135
 }
 # Additional parameters
 additionalCmdArgs=["--min"]

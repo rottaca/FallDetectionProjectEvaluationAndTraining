@@ -276,12 +276,12 @@ class EvaluationTools:
                     if res == 1:    # Not found before ?
                         CASum += 1
                         if fallInfoFileHandle != None:
-                            fallInfoFileHandle.write("F;"+fall.speed + ";" + fall.yCenter + "\n")
+                            fallInfoFileHandle.write(aedatFilePath + ";F;"+fall.speed + ";" + fall.yCenter + "\n")
                             fallInfoFileHandle.flush()
                 else:
                     FASum += 1
                     if fallInfoFileHandle != None:
-                        fallInfoFileHandle.write("NF;"+fall.speed + ";" + fall.yCenter + "\n")
+                        fallInfoFileHandle.write(aedatFilePath + ";NF;"+fall.speed + ";" + fall.yCenter + "\n")
                         fallInfoFileHandle.flush()
 
       print "------------- summary --------------"
