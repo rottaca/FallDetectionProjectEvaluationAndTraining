@@ -23,7 +23,7 @@ class Fall:
         output += " ,speed: " + str(self.speed)
     if self.yCenter != 0:
         output += " ,yCenter: " + str(self.yCenter)
-        
+
     return output
 
   def __repr__(self):
@@ -196,7 +196,7 @@ class EvaluationTools:
         objID = info[0]
         fType = info[1]
         timestamp = info[2].split(": ")[1]
-        
+
         type = ""
         if "[Fall]: Delayed" in fType:
             type="delayed"
@@ -211,7 +211,7 @@ class EvaluationTools:
         if len(info) == 5:
             speed = info[3].split(": ")[1]
             ycenter = info[4].split(": ")[1]
-                            
+
             # Process new event
             detectedFallsById[objID].newEvent(type, timestamp, speed, ycenter)
         else:
@@ -340,7 +340,6 @@ class EvaluationTools:
     return sensitivity + specificity - 1
 
   def evaluateParameterRange(self,paramName, valueList, addParams, outFileSuffix):
-
     headerStr = "Samples: "+ str(len(self.datFiles)) + ", Param: \"" + paramName + "\", Values: "
     for i in valueList:
       headerStr += str(i) + ", "
@@ -368,6 +367,7 @@ class EvaluationTools:
       self.timing_exec_count -= skippedValueCnt*len(self.datFiles)
     else:
       # File does not exist, create a new one and write the header
+      print "Output file does not exist, create new one!"
       paramValuesHandle = open(paramValuesOutFileName,"w")
       paramValuesHandle.write(headerStr)
       paramValuesHandle.flush()
@@ -420,34 +420,36 @@ class EvaluationTools:
     paramValuesHandle.close()
     return results
 
-  def evaluateParameterSet(self, paramSet, optimizedParams, additionalCmdArgs, optimizationRuns):
+  def evaluateParameterSet(self, paramSet, defaultParams, additionalCmdArgs, optimizationRuns):
     # runs * files * params
     self.timing_exec_count = optimizationRuns*len(self.datFiles)*len([j for i in paramSet for j in paramSet[i]])
     print "Execute program " + str(self.timing_exec_count) + " times..."
     if not os.path.isdir(self.outputDir):
         os.makedirs(self.outputDir)
-
-    for i in range(0,optimizationRuns):
+    optimizedParams = defaultParams
+    for i in range(optimizationRuns):
       print "Current optimal parameters:"
       print optimizedParams
       summaryFileHandle = open(self.outputDir + "/" + "summary.txt","w")
       for paramName in paramSet:
-        print "Param values for \""+ paramName+ "\":"
+        print "-------- Processing {} ---------".format(paramName)
+        print "Values:"
         print(paramSet[paramName])
-	args = []
-	args.extend(additionalCmdArgs)
-	# Take optimal parameters from previous iterations if they exist
-	for p in optimizedParams:
-	  # Don't take current parameter
-	  if p != paramName:
-	    args.append("--" + p + "=" + str(optimizedParams[p]))
+        args = []
+        args.extend(additionalCmdArgs)
+        # Take optimal parameters from previous iterations if they exist
+        for p in optimizedParams:
+          # Don't take current parameter
+         if p != paramName:
+            args.append("--" + p + "=" + str(optimizedParams[p]))
 
-	results = self.evaluateParameterRange(paramName, paramSet[paramName], args, "iter_" + str(i))
-	optimalParam = max(results,key=lambda x:x[1])
-	summaryFileHandle.write("Param: " + paramName + ", Optimal value: " + str(optimalParam[0]) + " with score " + str(optimalParam[1]) + "\n")
-	summaryFileHandle.flush()
-	optimizedParams[paramName]=optimalParam[0]
+        results = self.evaluateParameterRange(paramName, paramSet[paramName], args, "iter_" + str(i))
+        optimalParam = max(results,key=lambda x:x[1])
+        optimizedParams[paramName]=optimalParam[0]
+        
+        summaryFileHandle.write("Param: " + paramName + ", Optimal value: " + str(optimalParam[0]) + " with score " + str(optimalParam[1]) + "\n")
+        summaryFileHandle.flush()
+      
     summaryFileHandle.close()
 
     return optimizedParams
-

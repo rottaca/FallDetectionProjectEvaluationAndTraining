@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Directory for dataset
-dataDir=/tausch/FallDetectionProjectRecords
+dataDir=/datenspeicher/Tausch/FallDetectionProjectRecords
 # Subdirectory for unclassfied data
 unclassfiedDir=unclassified
 # Subdirectory for positive data
